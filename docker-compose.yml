@@ -1,0 +1,70 @@
+
+services:
+
+  # ── MongoDB 7 ──────────────────────────────────────────────────────────────
+  mongo:
+    image: mongo:7
+    container_name: financial-dw-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: secret
+      MONGO_INITDB_DATABASE: financial_dw
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Spring Boot application ────────────────────────────────────────────────
+  app:
+    build: .
+    container_name: financial-dw-app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Spring Boot 4.0 canonical binding: SPRING_MONGODB_URI -> spring.mongodb.uri.
+      # (Boot 4 renamed the prefix from spring.data.mongodb to spring.mongodb.)
+      SPRING_MONGODB_URI: "mongodb://admin:secret@mongo:27017/financial_dw?authSource=admin"
+      MONGO_URI: "mongodb://admin:secret@mongo:27017/financial_dw?authSource=admin"
+      NASDAQ_API_KEY: ${NASDAQ_API_KEY:-DEMO_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  # ── Apache Spark 4.1.x runtime (single container, local[*] for the lab) ──────
+  # Image Scala/Java MUST match spark-jobs/pom.xml: Spark 4.1.x, Scala 2.13, Java 21.
+  spark:
+    image: apache/spark:4.1.2-scala2.13-java21-python3-r-ubuntu
+    container_name: financial-dw-spark
+    user: root
+    environment:
+      MONGO_URI: "mongodb://admin:secret@mongo:27017/financial_dw?authSource=admin"
+    ports:
+      - "4040:4040"   # Spark application UI (active while a job runs)
+    volumes:
+      # Build the shaded JAR first:
+      #   cd spark-jobs && mvn clean package
+      # It is written to spark-jobs/target/spark-jobs-1.0.0-shaded.jar
+      - ./spark-jobs/target:/opt/spark-jobs:ro
+    # Keep the container alive so jobs can be submitted on demand via `docker exec`.
+    command: ["sleep", "infinity"]
+    depends_on:
+      mongo:
+        condition: service_healthy
+    # Submit jobs (local master is enough for the lab dataset):
+    #   docker exec financial-dw-spark /opt/spark/bin/spark-submit \
+    #     --class com.acme.financialdw.spark.AggregationJob \
+    #     --master "local[*]" \
+    #     --conf "spark.mongodb.read.connection.uri=mongodb://admin:secret@mongo:27017/financial_dw?authSource=admin" \
+    #     --conf "spark.mongodb.write.connection.uri=mongodb://admin:secret@mongo:27017/financial_dw?authSource=admin" \
+    #     /opt/spark-jobs/spark-jobs-1.0.0-shaded.jar
+
+volumes:
+  mongo_data:

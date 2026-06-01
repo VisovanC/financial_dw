@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.acme.financialdw</groupId>
+  <artifactId>spark-jobs</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+  <name>Financial DW – Spark Analytics Jobs</name>
+
+  <properties>
+    <java.version>21</java.version>
+    <maven.compiler.source>${java.version}</maven.compiler.source>
+    <maven.compiler.target>${java.version}</maven.compiler.target>
+    <!--
+      Lab spec: Apache Spark 4.1.x + MongoDB Connector.
+      Spark 4.x requires Scala 2.13 and Java 17+ (we use Java 21).
+      mongo-spark-connector 11.0+ is the line that supports Spark 4.0 and later
+      (10.x only supports Spark 3.x). These MUST stay aligned with the Spark
+      runtime image declared in docker-compose.yml.
+    -->
+    <spark.version>4.1.2</spark.version>
+    <scala.binary>2.13</scala.binary>
+    <mongo-spark.version>11.0.0</mongo-spark.version>
+  </properties>
+
+  <dependencies>
+
+    <!-- Spark core / SQL / MLlib — provided by the cluster at runtime -->
+    <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-core_${scala.binary}</artifactId>
+      <version>${spark.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-sql_${scala.binary}</artifactId>
+      <version>${spark.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-mllib_${scala.binary}</artifactId>
+      <version>${spark.version}</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- MongoDB Spark Connector — bundled in the fat JAR -->
+    <dependency>
+      <groupId>org.mongodb.spark</groupId>
+      <artifactId>mongo-spark-connector_${scala.binary}</artifactId>
+      <version>${mongo-spark.version}</version>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- Fat (shaded) JAR — bundles the MongoDB connector but excludes Spark -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.5.2</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals><goal>shade</goal></goals>
+            <configuration>
+              <outputFile>
+                ${project.build.directory}/${project.artifactId}-${project.version}-shaded.jar
+              </outputFile>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+</project>

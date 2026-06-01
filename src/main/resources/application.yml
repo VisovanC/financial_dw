@@ -1,0 +1,38 @@
+
+spring:
+  application:
+    name: financial-dw
+  # Spring Boot 4.0 moved Mongo connection properties from the old
+  # `spring.data.mongodb.*` prefix to `spring.mongodb.*`
+  # (MongoProperties is now @ConfigurationProperties("spring.mongodb")).
+  # The old prefix is silently ignored and the driver falls back to localhost:27017.
+  mongodb:
+    # Override at runtime with env var SPRING_MONGODB_URI. Default = docker "mongo" host.
+    # For running OUTSIDE docker (mvn spring-boot:run), set SPRING_MONGODB_URI with "localhost".
+    uri: ${SPRING_MONGODB_URI:mongodb://admin:secret@mongo:27017/financial_dw?authSource=admin}
+
+# SpringDoc / Swagger UI
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    try-it-out-enabled: true
+
+# Ingestion settings
+ingestion:
+  nasdaq-api-key: ${NASDAQ_API_KEY:DEMO_KEY}
+  nasdaq-base-url: https://data.nasdaq.com/api/v3
+  page-size: 100
+  batch-size: 50
+
+# AI Assistant (Anthropic Claude direct API)
+assistant:
+  anthropic-api-key: ${ANTHROPIC_API_KEY:}
+  model: claude-3-5-haiku-20241022
+  max-tokens: 4096
+  anthropic-version: "2023-06-01"
+  anthropic-base-url: https://api.anthropic.com
+
+server:
+  port: 8080

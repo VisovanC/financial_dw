@@ -24,19 +24,16 @@ through a REST API, Apache Spark analytics jobs, and an MCP server + LLM assista
   AI assistant endpoint.
 
 ## Prerequisites
-- Docker Desktop (with Docker Compose)
-- JDK 21 + Maven (only needed to build the Spark jobs JAR)
+- Docker Desktop
+- JDK 21 + Maven
 
 ## Quick start
-```bash
-# 1. Configure environment
-cp .env.example .env          # Windows: copy .env.example .env
-#   ANTHROPIC_API_KEY is optional (only for the AI assistant); no Nasdaq key required.
+```bash / Windows PS
 
-# 2. Build the Spark analytics JAR (mounted into the Spark container)
+# 1. Build the Spark analytics JAR (mounted into the Spark container)
 cd spark-jobs && mvn -ntp clean package && cd ..
 
-# 3. Start MongoDB + the app + Spark
+# 2. Start MongoDB + the app + Spark
 docker compose up -d --build
 ```
 The API comes up at **http://localhost:8080**. Swagger UI: **http://localhost:8080/swagger-ui.html**
@@ -52,6 +49,10 @@ curl -X POST "http://localhost:8080/api/v1/ingestion/run" \
   -H "Content-Type: application/json" \
   -d '{"symbols":["BTCUSD","ETHUSD"],"from":"2023-01-01","to":"2024-12-31"}'
 ```
+```Windows PS
+'{"symbols":["BTCUSD","ETHUSD"],"from":"2023-01-01","to":"2024-12-31"}' | Out-File -Encoding ascii body.json
+curl.exe -X POST "http://localhost:8080/api/v1/ingestion/run" -H "Content-Type: application/json" --data "@body.json"
+````
 Returns per-symbol counters (`fetched / stored / skipped / failed`). Safe to re-run (idempotent).
 
 ### Explore via REST
@@ -62,6 +63,13 @@ curl "http://localhost:8080/api/v1/data-sources"                # list data sour
 curl "http://localhost:8080/api/v1/data-sources/BITFINEX"       # one source's details
 # Time-series for an asset+source over a half-open [start, end) interval, newest first:
 curl "http://localhost:8080/api/v1/data?assetId=QDL/BITFINEX/BTCUSD&dataSourceId=BITFINEX&startBusinessDate=2024-01-01&endBusinessDate=2024-02-01&includeAttributes=true"
+```
+```Windows PS
+curl.exe "http://localhost:8080/api/v1/assets"
+curl.exe "http://localhost:8080/api/v1/assets/QDL/BITFINEX/BTCUSD"
+curl.exe "http://localhost:8080/api/v1/data-sources"
+curl.exe "http://localhost:8080/api/v1/data-sources/BITFINEX"
+curl.exe "http://localhost:8080/api/v1/data?assetId=QDL/BITFINEX/BTCUSD&dataSourceId=BITFINEX&startBusinessDate=2024-01-01&endBusinessDate=2024-02-01&includeAttributes=true"
 ```
 
 ### Run the Spark analytics
@@ -80,6 +88,14 @@ docker exec financial-dw-spark /opt/spark/bin/spark-submit \
 curl "http://localhost:8080/api/v1/spark/aggregation"
 curl "http://localhost:8080/api/v1/spark/regression/results"
 ```
+```Windows PS
+docker exec financial-dw-spark /opt/spark/bin/spark-submit --class com.acme.financialdw.spark.AggregationJob --master "local[*]" --conf "spark.mongodb.read.connection.uri=mongodb://admin:secret@mongo:27017/financial_dw?authSource=admin" --conf "spark.mongodb.write.connection.uri=mongodb://admin:secret@mongo:27017/financial_dw?authSource=admin" /opt/spark-jobs/spark-jobs-1.0.0-shaded.jar
+
+docker exec financial-dw-spark /opt/spark/bin/spark-submit --class com.acme.financialdw.spark.RegressionJob --master "local[*]" --conf "spark.mongodb.read.connection.uri=mongodb://admin:secret@mongo:27017/financial_dw?authSource=admin" --conf "spark.mongodb.write.connection.uri=mongodb://admin:secret@mongo:27017/financial_dw?authSource=admin" /opt/spark-jobs/spark-jobs-1.0.0-shaded.jar
+
+curl.exe "http://localhost:8080/api/v1/spark/aggregation"
+curl.exe "http://localhost:8080/api/v1/spark/regression/results"
+````
 
 ### MCP server (JSON-RPC 2.0)
 ```bash
@@ -87,17 +103,15 @@ curl "http://localhost:8080/mcp/tools"                          # browse availab
 curl -X POST "http://localhost:8080/mcp" -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"listAssets","arguments":{"offset":0,"limit":10}}}'
 ```
+```Windows PS
+curl.exe "http://localhost:8080/mcp/tools"
+'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"listAssets","arguments":{"offset":0,"limit":10}}}' | Out-File -Encoding ascii mcp.json
+curl.exe -X POST "http://localhost:8080/mcp" -H "Content-Type: application/json" --data "@mcp.json"
+```
 Tools: `listAssets`, `getAsset`, `listDataSources`, `getDataSource`, `getTimeSeries`, `getLatestPrice`.
 
-### AI assistant (requires ANTHROPIC_API_KEY)
-```bash
-curl -X POST "http://localhost:8080/api/v1/assistant/chat" \
-  -H "Content-Type: application/json" \
-  -d '{"message":"What is the latest BTCUSD price and how did it trend in Jan 2024?"}'
-```
-
 ## Tests
-```bash
+```bash / Windows PS
 mvn -ntp test
 ```
 
